@@ -1,0 +1,80 @@
+!pip install pandas numpy scikit-learn
+
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report
+from google.colab import files
+
+
+print("📁 Please upload your CSV file (must include 'text' and 'label' columns)")
+uploaded = files.upload()
+
+
+for file_name in uploaded.keys():
+    df = pd.read_csv(file_name)
+
+
+print("📊 Dataset preview:")
+print(df.head())
+
+
+if 'label' not in df.columns or 'text' not in df.columns:
+    print("❌ ERROR: CSV must include 'text' and 'label' columns.")
+else:
+
+    df.dropna(subset=['text', 'label'], inplace=True)
+
+
+    if df['label'].dtype == object:
+
+        print("Unique label values before mapping:", df['label'].unique())
+
+        df['label'] = df['label'].map({'FAKE': 0, 'REAL': 1, 'fake': 0, 'real': 1})
+
+
+        if df['label'].isnull().any():
+            print("WARNING: NaN values found in labels after mapping. Potentially unexpected label values in the dataset.")
+            print("Rows with NaN labels:")
+            print(df[df['label'].isnull()])
+
+
+    df['label'] = pd.to_numeric(df['label'], errors='coerce')
+
+
+    df.dropna(subset=['label'], inplace=True)
+
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        df['text'], df['label'], test_size=0.2, random_state=42
+    )
+
+
+    print("Unique values in y_train:", y_train.unique())
+    print("Unique values in y_test:", y_test.unique())
+
+
+    vectorizer = TfidfVectorizer(stop_words='english', max_df=0.7)
+    X_train_tfidf = vectorizer.fit_transform(X_train)
+    X_test_tfidf = vectorizer.transform(X_test)
+
+
+    model = LogisticRegression()
+    model.fit(X_train_tfidf, y_train)
+
+
+    y_pred = model.predict(X_test_tfidf)
+    print("✅ Model Accuracy:", accuracy_score(y_test, y_pred))
+    print("\n📄 Classification Report:\n", classification_report(y_test, y_pred))
+
+    def predict_news(news_text):
+        transformed = vectorizer.transform([news_text])
+        result = model.predict(transformed)[0]
+        return "REAL" if result == 1 else "FAKE"
+
+    # Example usage
+    sample = input("📰 Enter a news headline or article to verify: ")
+    print("🔎 Prediction:", predict_news(sample))
